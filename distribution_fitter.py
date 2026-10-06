@@ -295,35 +295,38 @@ def extract_winning_parameters(results_df, discrete_flag):
     if dist_name == "Normal":
         formatted_params = {"Mean (loc)": params[0], "Standard Deviation (scale)": params[1]}
     elif dist_name == "Exponential":
-        formatted_params = {"Color/Shift (loc)": params[0], "Scale (1/rate)": params[1]}
-    elif dist_name == "Poisson":
-        formatted_params = {"Lambda (mu)": params[0], "Shift (loc)": params[1]}
-    elif dist_name == "Binomial":
-        formatted_params = {"Trials (n)": params[0], "Probability (p)": params[1], "Shift (loc)": params[2]}
-    elif dist_name == "Bernoulli":
-        formatted_params = {"Probability (p)": params[0], "Shift (loc)": params[1]}
+        formatted_params = {"Shift (loc)": params[0], "Scale (1/rate)": params[1]}
     elif dist_name == "Gamma":
         formatted_params = {"Shape (a)": params[0], "Shift (loc)": params[1], "Scale": params[2]}
     elif dist_name == "Lognormal":
         formatted_params = {"Shape (s)": params[0], "Shift (loc)": params[1], "Scale": params[2]}
-    elif dist_name == "Discrete Uniform":
-        formatted_params = {
-            "Minimum Value (low)": params[0],
-            "Upper Bound (high, exclusive)": params[1],
-            "Shift (loc)": params[2]
-        }
+    elif dist_name == "Beta":
+        formatted_params = {"Shape 1 (a)": params[0], "Shape 2 (b)": params[1], "Shift (loc)": params[2], "Scale": params[3]}
     elif dist_name == "Uniform":
         formatted_params = {
             "Minimum (loc)": params[0],
             "Maximum": params[0] + params[1],
             "Range (scale)": params[1]
         }
+    elif dist_name == "Poisson":
+        formatted_params = {"Lambda (mu)": params[0], "Shift (loc)": params[1]}
+    elif dist_name == "Binomial":
+        formatted_params = {"Trials (n)": params[0], "Probability (p)": params[1], "Shift (loc)": params[2]}
+    elif dist_name == "Geometric":
+        formatted_params = {"Probability (p)": params[0], "Shift (loc)": params[1]}
+    elif dist_name == "Negative Binomial":
+        formatted_params = {"Number of Successes (n)": params[0], "Probability (p)": params[1], "Shift (loc)": params[2]}
+    elif dist_name == "Discrete Uniform":
+        formatted_params = {
+            "Minimum Value (low)": params[0],
+            "Upper Bound (high, exclusive)": params[1],
+            "Shift (loc)": params[2]
+        }
+    elif dist_name == "Bernoulli":
+        formatted_params = {"Probability (p)": params[0], "Shift (loc)": params[1]}
     else:
         # Fallback for any other distribution
         formatted_params = {f"Param {i}": p for i, p in enumerate(params)}
-
-    return dist_name, formatted_params
-
 
     
 # **MATTHIAS' PORTION (TASK 5)**
