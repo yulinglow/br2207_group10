@@ -71,6 +71,15 @@ def get_input_data():
                 st.error(f"⚠️ {e}")
                 return None, False
 
+            # --- ADD PREVIEW HERE ---
+            st.markdown(f"**Preview: {uploaded.name}**")
+            st.dataframe(df.head(10), use_container_width=True)
+            st.caption(
+                "File loaded successfully. Select a numeric column below; "
+                "blank and non-numeric cells will be handled automatically."
+            )
+            # ------------------------
+
             # The column selector sits above the button so changing it never clears the results
             column = columns[0]
             if len(columns) > 1:
