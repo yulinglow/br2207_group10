@@ -222,4 +222,145 @@ def fit_continuous(data: np.ndarray) -> pd.DataFrame:
                          "aic": aic, "ks_stat": ks_stat, "ks_pvalue": ks_pvalue})
         except Exception as e:
             rows.append({"distribution": name, "params": None, "log_likelihood": np.nan,
-                         "aic": np.nan, "ks_stat": np.nan,
+                         "aic": np.nan, "ks_stat": np.nan, "ks_pvalue": np.nan,
+                         "error": str(e)})
+
+    return pd.DataFrame(rows).sort_values("aic").reset_index(drop=True)
+
+
+def fit_discrete(data: np.ndarray) -> pd.DataFrame:
+    """
+    Fit each discrete candidate by Maximum Likelihood and evaluate it with:
+      - AIC: relative ranking (lower is better)
+      - Chi-square test: absolute plausibility of each fit on its own
+    Returns a DataFrame ranked by AIC (best first).
+    """
+    n = len(data)
+    data_int = data.astype(int)
+    rows = []
+
+    for name, dist in DISCRETE_CANDIDATES.items():
+        try:
+            bounds = _discrete_bounds(name, data)
+            params = tuple(stats.fit(dist, data, bounds=bounds).params)
+            fitted_dist = dist(*params)
+
+            loglik = np.sum(fitted_dist.logpmf(data))
+            if not np.isfinite(loglik):
+                raise ValueError(f"Data falls outside {name}'s support - not a viable candidate")
+
+            k = len(bounds)  # number of estimated (shape) parameters; loc is fixed at 0
+            aic = 2 * k - 2 * loglik
+            chi2_stat, chi2_pvalue = chisq_gof(fitted_dist, data_int, n, k)
+
+            rows.append({"distribution": name, "params": params, "log_likelihood": loglik,
+                         "aic": aic, "chi2_stat": chi2_stat, "chi2_pvalue": chi2_pvalue})
+        except Exception as e:
+            rows.append({"distribution": name, "params": None, "log_likelihood": np.nan,
+                         "aic": np.nan, "chi2_stat": np.nan, "chi2_pvalue": np.nan,
+                         "error": str(e)})
+
+    return pd.DataFrame(rows).sort_values("aic").reset_index(drop=True)
+
+
+def fit_best_distribution(data: np.ndarray):
+    """
+    Single entry point for fitting (the app must call this).
+
+    Detects whether the data is discrete or continuous, runs the matching
+    pipeline, and returns (ranked_results_df, discrete_flag).
+    """
+    discrete = is_discrete(data)
+    results = fit_discrete(data) if discrete else fit_continuous(data)
+    return results, discrete
+
+
+# ============================================================
+# 4. PARAMETERS
+# ============================================================
+
+def _get_winner(results_df: pd.DataFrame):
+    """Return the top-ranked row, or raise if no distribution was fitted successfully."""
+    if results_df.empty or results_df.iloc[0]["params"] is None:
+        raise ValueError("No valid winning distribution found.")
+    return results_df.iloc[0]
+
+
+def get_fitted_distribution(results_df: pd.DataFrame, discrete_flag: bool):
+    """Return (name, frozen scipy distribution) for the winning fit."""
+    best = _get_winner(results_df)
+    candidates = DISCRETE_CANDIDATES if discrete_flag else CONTINUOUS_CANDIDATES
+    return best["distribution"], candidates[best["distribution"]](*best["params"])
+
+
+def extract_winning_parameters(results_df: pd.DataFrame, discrete_flag: bool):
+    """Return (distribution_name, {readable label: value}) for the winning fit."""
+    best = _get_winner(results_df)
+    name, params = best["distribution"], best["params"]
+
+    labels = PARAMETER_LABELS.get(name, [f"Param {i + 1}" for i in range(len(params))])
+    formatted = dict(zip(labels, params))
+
+    if name == "Uniform":  # also report the upper end of the range
+        formatted = {
+            "Minimum (loc)": params[0],
+            "Maximum": params[0] + params[1],
+            "Range (scale)": params[1],
+        }
+    return name, formatted
+
+
+# ============================================================
+# 5. MOMENTS
+# ============================================================
+
+def _ordinal(n: int) -> str:
+    return {1: "1st", 2: "2nd", 3: "3rd"}.get(n, f"{n}th")
+
+
+def calculate_moments(data: np.ndarray, results_df: pd.DataFrame, discrete_flag: bool):
+    """
+    Compare the raw data with the winning distribution.
+
+    Returns (distribution_name, raw_moments_df, characteristics_df):
+      - raw_moments_df: first four raw moments
+      - characteristics_df: mean, variance, skewness, kurtosis (Pearson)
+    """
+    dist_name, fitted_dist = get_fitted_distribution(results_df, discrete_flag)
+
+    # Part A: first four raw moments, E[X^r]
+    raw_rows = []
+    for order in range(1, 5):
+        empirical = np.mean(data ** order)
+        theoretical = fitted_dist.moment(order)
+        raw_rows.append({
+            "Moment": f"{_ordinal(order)} Raw Moment",
+            "Raw Data": empirical,
+            "Winning Distribution": theoretical,
+            "Absolute Difference": abs(empirical - theoretical),
+        })
+    raw_moments_df = pd.DataFrame(raw_rows)
+
+    # Part B: distribution characteristics
+    fitted_mean, fitted_var, fitted_skew, fitted_excess_kurt = fitted_dist.stats(moments="mvsk")
+
+    characteristics_df = pd.DataFrame({
+        "Statistic": ["Mean", "Variance", "Skewness", "Kurtosis"],
+        "Raw Data": [
+            np.mean(data),
+            np.var(data, ddof=0),
+            stats.skew(data, bias=True),
+            stats.kurtosis(data, fisher=False, bias=True),
+        ],
+        "Winning Distribution": [
+            float(fitted_mean),
+            float(fitted_var),
+            float(fitted_skew),
+            float(fitted_excess_kurt) + 3,  # scipy gives excess kurtosis; add 3 for Pearson
+        ],
+    })
+    characteristics_df["Absolute Difference"] = abs(
+        characteristics_df["Raw Data"] - characteristics_df["Winning Distribution"]
+    )
+
+    return dist_name, raw_moments_df, characteristics_df
