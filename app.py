@@ -110,7 +110,7 @@ def show_summary(winning_dist, discrete, n_obs):
     col3.metric("🔢 Observations", n_obs)
 
 
-def show_ranking(valid_results, discrete):
+def show_ranking(results, valid_results, discrete):
     st.header("3. Distribution Ranking")
 
     if discrete:
@@ -128,6 +128,13 @@ def show_ranking(valid_results, discrete):
         "Distributions are ranked using AIC. A lower AIC indicates a better "
         "relative fit among the distributions tested."
     )
+
+    # Never hide failed fits silently - show which ones failed and why
+    failed = results[results["aic"].isna()]
+    if not failed.empty:
+        with st.expander(f"⚠️ {len(failed)} distribution(s) could not be fitted"):
+            for _, row in failed.iterrows():
+                st.write(f"**{row['distribution']}**: {row.get('error', 'unknown error')}")
 
 
 def show_parameters(winning_dist, param_dict):
@@ -347,7 +354,7 @@ if data is not None:
 
         st.success("✅ Analysis complete!")
         show_summary(winning_dist, discrete, len(data))
-        show_ranking(valid_results, discrete)
+        show_ranking(results, valid_results, discrete)
         show_parameters(winning_dist, param_dict)
         show_moments(data, results, discrete, winning_dist)
         show_visualisations(data, results, discrete)
