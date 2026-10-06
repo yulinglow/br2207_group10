@@ -8,12 +8,9 @@ Calculation functions for the Distribution Fit Explorer app:
     3. Goodness-of-fit evaluation
     4. Winning distribution parameters
     5. Moment comparison
-
-This module contains no UI, print or input() code, so it can be imported
-safely by the Streamlit app.
 """
 
-import re
+import re 
 import warnings
 
 import numpy as np
