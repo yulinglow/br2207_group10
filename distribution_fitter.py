@@ -216,7 +216,8 @@ def fit_continuous(data: np.ndarray) -> pd.DataFrame:
 
             loglik = np.sum(dist.logpdf(data, *params))
             aic = 2 * len(params) - 2 * loglik
-            ks_stat, ks_pvalue = stats.kstest(data, dist.name, args=params)
+            # Use explicit dist.cdf to avoid positional argument mapping issues with internal string lookups
+            ks_stat, ks_pvalue = stats.kstest(data, dist.cdf, args=params)
 
             rows.append({"distribution": name, "params": params, "log_likelihood": loglik,
                          "aic": aic, "ks_stat": ks_stat, "ks_pvalue": ks_pvalue})
